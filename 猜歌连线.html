@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>猜歌连线</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='4' fill='%234a7ab8'/%3E%3Ctext x='32' y='44' font-size='28' text-anchor='middle' fill='white'%3E%E2%99%AA%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg1: #e8f0f8; --bg2: #d0e0f0; --bg3: #f0f6fc;
+  --card: #ffffff; --card-border: #4a6fa5;
+  --accent: #2c4a7a; --accent2: #4a6fa5; --accent3: #6a9ac8;
+  --green: #4a8a5a; --red: #c85a5a; --text: #2c4a7a; --text2: #6a8aaa;
+  --gold: #c9a96e;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: "KaiTi", "STKaiti", "楷体", "FangSong", "仿宋", serif;
+  background: 
+    linear-gradient(rgba(255,255,255,0.2), rgba(255,255,255,0.2)),
+    url('assets/bg2.jpg') center/cover no-repeat fixed;
+  min-height: 100vh; color: var(--text); overflow-x: hidden; user-select: none;
+}
+.glow { position: fixed; border-radius: 50%; filter: blur(80px); opacity: 0.15; z-index: 0; pointer-events: none; }
+.glow1 { width: 500px; height: 500px; background: #8fb8d8; top: -150px; left: -150px; }
+.glow2 { width: 400px; height: 400px; background: #c9a96e; bottom: -100px; right: -100px; }
+
+.topbar {
+  position: relative; z-index: 10; display: flex; flex-direction: column; align-items: center;
+  padding: 16px 20px; max-width: 600px; margin: 0 auto; gap: 12px;
+}
+.topbar h1 { 
+  font-size: 36px; font-weight: 900; 
+  color: #2c4a7a;
+  font-family: "KaiTi", "STKaiti", "楷体", serif;
+  letter-spacing: 6px;
+  text-shadow: 3px 3px 6px rgba(44,74,122,0.2);
+}
+.topbar .actions { 
+  position: absolute; top: 16px; right: 20px;
+  display: flex; gap: 8px; 
+}
+.btn {
+  padding: 8px 20px; border-radius: 20px; border: 2px solid #4a6fa5;
+  background: linear-gradient(180deg, #ffffff 0%, #f0f6fc 100%); 
+  color: #2c4a7a; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s; 
+  font-family: "KaiTi", "STKaiti", "楷体", serif;
+  box-shadow: 0 4px 12px rgba(74,111,165,0.2);
+}
+.btn:hover { 
+  background: linear-gradient(180deg, #ffffff 0%, #e0eaf5 100%); 
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(74,111,165,0.3); 
+}
+.btn.primary { 
+  background: linear-gradient(180deg, #ffe8e8 0%, #ffd6d6 100%); 
+  border-color: #c85a5a; 
+  color: #8b2a2a; 
+}
+.btn.danger { 
+  background: linear-gradient(180deg, #ffe8e8 0%, #ffd6d6 100%); 
+  border-color: #c85a5a; 
+  color: #8b2a2a; 
+}
+
+.level-tabs {
+  position: relative; z-index: 10; display: flex; justify-content: center; gap: 6px; padding: 0 20px 10px;
+  max-width: 600px; margin: 0 auto; overflow-x: auto;
+}
+.level-tab {
+  padding: 8px 24px; border-radius: 20px; white-space: nowrap; cursor: pointer;
+  background: linear-gradient(180deg, #ffffff 0%, #f0f6fc 100%); 
+  border: 2px solid #4a6fa5; 
+  color: #2c4a7a;
+  font-size: 16px; font-weight: 600;
+  transition: all 0.2s; 
+  font-family: "KaiTi", "STKaiti", "楷体", serif;
+  box-shadow: 0 4px 12px rgba(74,111,165,0.2);
+}
+.level-tab.active { 
+  background: linear-gradient(180deg, #ffe8e8 0%, #ffd6d6 100%); 
+  border-color: #c85a5a; 
+  color: #8b2a2a; 
+}
+
+.game {
+  position: relative; z-index: 5; display: flex; justify-content: space-between;
+  max-width: 500px; margin: 0 auto; padding: 10px 20px;
+}
+.col { display: flex; flex-direction: column; gap: 10px; width: 47%; }
+
+.card {
+  position: relative; padding: 16px 14px; border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 2px solid #4a6fa5;
+  cursor: pointer; transition: all 0.2s;
+  text-align: center; font-size: 16px; font-weight: 600; min-height: 54px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-family: "KaiTi", "STKaiti", "楷体", serif;
+  box-shadow: 
+    0 4px 12px rgba(74,111,165,0.15), 
+    inset 0 1px 0 rgba(255,255,255,0.9);
+}
+/* 四角花纹装饰 */
+.card::before, .card::after {
+  content: '';
+  position: absolute;
+  width: 12px; height: 12px;
+  border: 2px solid #4a6fa5;
+  pointer-events: none;
+}
+.card::before {
+  top: -2px; left: -2px;
+  border-right: none; border-bottom: none;
+  border-top-left-radius: 8px;
+}
+.card::after {
+  bottom: -2px; right: -2px;
+  border-left: none; border-top: none;
+  border-bottom-right-radius: 8px;
+}
+.card:hover { 
+  background: linear-gradient(180deg, #ffffff 0%, #eef5ff 100%); 
+  transform: translateY(-2px); 
+  box-shadow: 0 6px 20px rgba(74,111,165,0.25); 
+}
+.card .play {
+  width: 0; height: 0; border-left: 8px solid currentColor;
+  border-top: 5px solid transparent; border-bottom: 5px solid transparent; flex-shrink: 0;
+}
+.card.playing { 
+  background: linear-gradient(180deg, #fff8e8 0%, #fff0d6 100%); 
+  border-color: #c9a96e; 
+  color: #8b6914; 
+}
+.card.selected { 
+  background: linear-gradient(180deg, #ffe8e8 0%, #ffd6d6 100%); 
+  border-color: #c85a5a; 
+  color: #8b2a2a; 
+  box-shadow: 0 0 0 3px rgba(200,90,90,0.2); 
+}
+.card.selected::before, .card.selected::after { border-color: #c85a5a; }
+.card.matched { 
+  background: linear-gradient(180deg, #e8f5e8 0%, #d6eed6 100%); 
+  border-color: #4a8a5a; 
+  color: #2a6a3a; 
+  pointer-events: none; 
+}
+.card.matched::before, .card.matched::after { border-color: #4a8a5a; }
+.card.wrong { 
+  background: linear-gradient(180deg, #ffe8e8 0%, #ffd6d6 100%); 
+  border-color: #c85a5a; 
+  color: #8b2a2a; 
+  pointer-events: none; 
+}
+.card.wrong::before, .card.wrong::after { border-color: #c85a5a; }
+.card.wrong { animation: shake 0.4s; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+
+#line-svg { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:3; }
+#line-svg path { fill:none; stroke-width:2.5; stroke-linecap:round; }
+
+.status { position: fixed; bottom: 16px; left:0; right:0; z-index:10; text-align:center; }
+.status-box {
+  display: inline-flex; align-items:center; gap: 12px; padding: 8px 18px;
+  background: var(--card); border: 1px solid var(--card-border); border-radius: 20px;
+  backdrop-filter: blur(10px); font-size: 13px;
+}
+.status-box .err { color: var(--red); font-weight: 700; }
+.loading { text-align:center; padding: 40px; color: var(--text2); }
+
+.overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
+  display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px);
+}
+.overlay.show { display: flex; }
+.modal {
+  background: linear-gradient(180deg, #1e1b4b, #0f0c29);
+  border: 1px solid var(--card-border); border-radius: 18px;
+  padding: 24px; max-width: 400px; width: 92%; max-height: 85vh; overflow-y: auto;
+}
+.modal h2 { font-size: 18px; margin-bottom: 16px; text-align: center; color: var(--accent); }
+.modal .close { float: right; cursor: pointer; color: var(--text2); font-size: 20px; margin-top: -4px; }
+
+.f-group { margin-bottom: 12px; }
+.f-group label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+.f-group input, .f-group select {
+  width: 100%; padding: 9px 12px; border-radius: 10px;
+  background: rgba(255,255,255,0.08); border: 1px solid var(--card-border);
+  color: var(--text); font-size: 14px; outline: none;
+}
+.f-group input:focus { border-color: var(--accent); }
+.f-group .file-btn {
+  display: block; padding: 9px; border-radius: 10px; text-align: center;
+  background: rgba(129,140,248,0.15); border: 1px dashed var(--accent);
+  cursor: pointer; font-size: 13px; color: var(--accent);
+}
+.f-group .file-btn.big {
+  padding: 16px 12px; font-size: 14px; font-weight: 600;
+  border-width: 2px; border-style: dashed;
+  background: rgba(129,140,248,0.2);
+}
+.f-group .file-btn.has { background: rgba(52,211,153,0.15); border-color: var(--green); color: var(--green); }
+.f-group .file-btn { position: relative; overflow: hidden; }
+.f-group input[type=file] {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  opacity: 0; cursor: pointer;
+}
+.row { display: flex; gap: 8px; }
+.row > * { flex: 1; }
+
+.edit-item {
+  padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.05);
+  margin-bottom: 8px; border: 1px solid var(--card-border); cursor: pointer;
+}
+.edit-item .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.edit-item .head .title { font-size: 13px; font-weight: 600; }
+.edit-item .del { color: var(--red); cursor: pointer; font-size: 16px; }
+.audio-tag {
+  display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-right: 4px;
+}
+.audio-tag.yes { background: rgba(52,211,153,0.2); color: var(--green); }
+.audio-tag.no { background: rgba(248,113,113,0.2); color: var(--red); }
+
+.toast {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  padding: 12px 24px; background: rgba(0,0,0,0.85); border-radius: 12px;
+  font-size: 14px; z-index: 200; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="glow glow1"></div>
+<div class="glow glow2"></div>
+<!-- 古风装饰 -->
+<div style="position:fixed;top:0;left:0;right:0;height:100px;background:linear-gradient(180deg, rgba(138,180,216,0.3) 0%, transparent 100%);pointer-events:none;z-index:1"></div>
+<div style="position:fixed;bottom:0;left:0;right:0;height:120px;background:linear-gradient(0deg, rgba(201,169,110,0.2) 0%, transparent 100%);pointer-events:none;z-index:1"></div>
+<!-- 手拿笔（连线时显示） -->
+<img id="hand" src="assets/hand3.png" style="position:fixed;width:160px;display:none;pointer-events:none;z-index:9999;mix-blend-mode:multiply" alt="">
+
+<div class="topbar">
+  <h1>猜歌连线</h1>
+  <div class="actions">
+    <button class="btn" onclick="openPwd()">编辑题库</button>
+    <button class="btn" onclick="restart()">重开</button>
+  </div>
+</div>
+
+<div class="level-tabs" id="tabs"></div>
+
+<div class="game" id="game">
+  <svg id="line-svg"></svg>
+  <div class="col" id="leftCol"></div>
+  <div class="col" id="rightCol"></div>
+</div>
+
+<div class="status">
+  <div class="status-box">
+    <span>错误 <b class="err" id="errCount">0</b></span>
+    <span id="progress"></span>
+  </div>
+</div>
+
+<div style="text-align:center;margin-top:16px">
+  <button class="btn danger" onclick="giveUp()">弃权提交</button>
+</div>
+
+<div class="overlay" id="winOv">
+  <div class="modal" style="text-align:center">
+    <h2 id="winTitle">🎉 通关啦！</h2>
+    <p style="color:var(--text2);font-size:14px;margin:12px 0" id="winText"></p>
+    <button class="btn primary" onclick="nextLevel()" style="width:100%">下一关</button>
+  </div>
+</div>
+
+<!-- ===== 密码验证弹窗 ===== -->
+<div class="overlay" id="pwdOv" style="display:none">
+  <div class="modal" style="max-width:320px">
+    <span class="close" onclick="closePwd()">&times;</span>
+    <h2>管理员验证</h2>
+    <p style="color:var(--text2);font-size:13px;margin:8px 0 16px">编辑题库需要输入管理员密码</p>
+    <div class="f-group">
+      <input type="password" id="pwdInput" placeholder="请输入密码">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn" style="flex:1" onclick="closePwd()">取消</button>
+      <button class="btn primary" style="flex:1" onclick="checkPwd()">确认</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="editorOv">
+  <div class="modal">
+    <span class="close" onclick="closeEditor()">&times;</span>
+    <h2>编辑题库</h2>
+    <button class="btn" onclick="addLevel()" style="width:100%;margin-bottom:12px">+ 新建关卡</button>
+    <div class="f-group">
+      <label>当前关卡</label>
+      <div style="display:flex;gap:6px">
+        <select id="editLevel" style="flex:1"></select>
+        <button class="btn danger" onclick="deleteLevel()">删关卡</button>
+      </div>
+    </div>
+    <div class="f-group">
+      <label>关卡名</label>
+      <input type="text" id="levelName" placeholder="如：啊~ 关">
+    </div>
+    <div class="f-group">
+      <label>左侧按钮文字（语气词）</label>
+      <input type="text" id="levelParticle" placeholder="如：啊~">
+    </div>
+    <button class="btn" onclick="saveLevelMeta()" style="width:100%;margin-bottom:16px">保存关卡设置</button>
+    <div style="border-top:1px solid var(--card-border);margin:16px 0"></div>
+    <h3 style="font-size:14px;margin-bottom:10px">歌曲列表</h3>
+    <div id="songList"></div>
+    <button class="btn primary" onclick="addSong()" style="width:100%;margin-top:8px">+ 添加歌曲</button>
+  </div>
+</div>
+
+<div class="overlay" id="songOv">
+  <div class="modal">
+    <span class="close" onclick="closeSongEditor()">&times;</span>
+    <h2>编辑歌曲</h2>
+    <div class="f-group">
+      <label>右边歌词文字</label>
+      <input type="text" id="sLyric" placeholder="如：我的妻王氏宝钏">
+    </div>
+    <div class="f-group">
+      <label>歌曲名（判断对错用）</label>
+      <input type="text" id="sSong" placeholder="如：武家坡2021">
+    </div>
+    <div class="row">
+      <div class="f-group">
+        <label>📤 左侧切片音频（点这里选本地文件）</label>
+        <label class="file-btn big" id="leftFileBtn">
+          <span id="leftFileText">选择音频文件</span>
+          <input type="file" id="sLeftAudio" accept="audio/*">
+        </label>
+      </div>
+      <div class="f-group">
+        <label>📤 右侧切片音频（点这里选本地文件）</label>
+        <label class="file-btn big" id="rightFileBtn">
+          <span id="rightFileText">选择音频文件</span>
+          <input type="file" id="sRightAudio" accept="audio/*">
+        </label>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn" id="testLeftBtn" style="flex:1">试听左</button>
+      <button class="btn" id="testRightBtn" style="flex:1">试听右</button>
+    </div>
+    <button class="btn primary" onclick="saveSong()" style="width:100%;margin-top:12px">保存</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== Supabase 配置 =====
+const SUPABASE_URL = "https://wcxungdjbfeoaonnzudl.supabase.co";
+const SUPABASE_KEY = "sb_publishable_JaR1P8jmca4KwBt9dwVK-Q_-ahKwX2O";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ===== Web Audio 合成器 =====
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+// 音符名转频率
+function noteToFreq(note) {
+  const notes = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  const m = note.match(/([A-G])(#?)(\d)/);
+  if (!m) return 440;
+  const [, letter, sharp, octave] = m;
+  let semitone = notes[letter] + (sharp ? 1 : 0);
+  const midi = parseInt(octave) * 12 + semitone + 12;
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+// 播放合成旋律
+function playSynth(notesStr) {
+  const ctx = getAudioCtx();
+  const notes = notesStr.split(",");
+  const noteDur = 0.35; // 每个音符时长
+  const now = ctx.currentTime;
+  
+  notes.forEach((note, i) => {
+    const freq = noteToFreq(note);
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.type = "triangle";
+    osc.frequency.value = freq;
+    
+    gain.gain.setValueAtTime(0, now + i * noteDur);
+    gain.gain.linearRampToValueAtTime(0.3, now + i * noteDur + 0.05);
+    gain.gain.linearRampToValueAtTime(0, now + (i + 1) * noteDur);
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.start(now + i * noteDur);
+    osc.stop(now + (i + 1) * noteDur);
+  });
+  
+  return notes.length * noteDur * 1000; // 返回总时长
+}
+
+// ===== 状态 =====
+let levels = [];
+let lvIdx = 0, errCount = 0, pickedLeft = null, matched = {}, answeredSet = new Set();
+let curAudio = null, synthTimer = null;
+let editSongIdx = null;
+let pendingLeftAudio = null, pendingRightAudio = null;
+
+// ===== 工具 =====
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1500);
+}
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+// ===== 从数据库加载 =====
+async function loadData() {
+  const { data: lvData, error: lvErr } = await sb.from("levels").select("*").order("sort_order");
+  if (lvErr) { toast("加载关卡失败: " + lvErr.message); return; }
+  
+  const { data: songData, error: songErr } = await sb.from("songs").select("*").order("sort_order");
+  if (songErr) { toast("加载歌曲失败: " + songErr.message); return; }
+  
+  levels = lvData.map(lv => ({
+    id: lv.id,
+    name: lv.name,
+    particle: lv.particle,
+    songs: songData.filter(s => s.level_id === lv.id).map(s => ({
+      id: s.id,
+      lyric: s.lyric,
+      song: s.song,
+      leftAudio: s.left_audio,
+      rightAudio: s.right_audio
+    }))
+  }));
+  
+  if (levels.length > 0) loadLevel(0);
+  else document.getElementById("leftCol").innerHTML = '<div class="loading">暂无关卡，点右上角「编辑」添加</div>';
+}
+
+// ===== 渲染 =====
+function renderTabs() {
+  const el = document.getElementById("tabs");
+  el.innerHTML = "";
+  // 只显示当前关卡
+  const lv = levels[lvIdx];
+  if (!lv) return;
+  const t = document.createElement("div");
+  t.className = "level-tab active";
+  t.textContent = `第${lvIdx + 1}关`;
+  el.appendChild(t);
+}
+
+function loadLevel(idx) {
+  lvIdx = idx; errCount = 0; matched = {}; answeredSet = new Set(); pickedLeft = null;
+  document.getElementById("errCount").textContent = "0";
+  document.getElementById("winOv").classList.remove("show");
+  stopAudio();
+  const lv = levels[idx];
+  if (!lv) return;
+  const leftCol = document.getElementById("leftCol");
+  const rightCol = document.getElementById("rightCol");
+  leftCol.innerHTML = ""; rightCol.innerHTML = "";
+  const leftSongs = shuffle(lv.songs.map((s,i) => ({...s, _l: i})));
+  leftSongs.forEach(s => {
+    const b = document.createElement("div");
+    b.className = "card"; b.dataset.id = s._l;
+    b.innerHTML = `<span class="play"></span>${lv.particle}`;
+    b.onclick = () => onLeft(b, s);
+    leftCol.appendChild(b);
+  });
+  const rightSongs = shuffle(lv.songs.map((s,i) => ({...s, _r: i})));
+  rightSongs.forEach(s => {
+    const b = document.createElement("div");
+    b.className = "card"; b.dataset.id = s._r; b.dataset.song = s.song;
+    b.innerHTML = `<span class="play"></span>${s.lyric}`;
+    b.onclick = () => onRight(b, s);
+    rightCol.appendChild(b);
+  });
+  renderTabs();
+  document.getElementById("line-svg").innerHTML = "";
+  updateProgress();
+}
+
+function updateProgress() {
+  const total = levels[lvIdx].songs.length;
+  const done = Object.keys(matched).length;
+  document.getElementById("progress").textContent = `${done}/${total}`;
+}
+
+function stopAudio() {
+  if (curAudio) { curAudio.pause(); curAudio = null; }
+  if (synthTimer) { clearTimeout(synthTimer); synthTimer = null; }
+  // 停止合成音
+  if (audioCtx) {
+    audioCtx.close();
+    audioCtx = null;
+  }
+  document.querySelectorAll(".card.playing").forEach(b => b.classList.remove("playing"));
+}
+
+// 古风音效
+function playCorrectSound() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+  notes.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = freq;
+    osc.type = "triangle";
+    gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.1);
+    gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + i * 0.1 + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.5);
+    osc.start(ctx.currentTime + i * 0.1);
+    osc.stop(ctx.currentTime + i * 0.1 + 0.5);
+  });
+}
+
+function playWrongSound() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const notes = [392, 369.99, 349.23]; // G4 F#4 F4 下降音
+  notes.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = freq;
+    osc.type = "sawtooth";
+    gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.15);
+    gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + i * 0.15 + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.4);
+    osc.start(ctx.currentTime + i * 0.15);
+    osc.stop(ctx.currentTime + i * 0.15 + 0.4);
+  });
+}
+
+function playSrc(src, btn) {
+  stopAudio();
+  if (!src) { toast("没配音频"); return; }
+  
+  if (src.startsWith("synth:")) {
+    // 合成音频
+    const notes = src.substring(6);
+    const dur = playSynth(notes);
+    btn.classList.add("playing");
+    synthTimer = setTimeout(() => btn.classList.remove("playing"), dur);
+  } else {
+    // 真实音频
+    const a = new Audio(src);
+    curAudio = a;
+    a.play().catch(()=>toast("播放失败"));
+    btn.classList.add("playing");
+    a.onended = a.onpause = () => btn.classList.remove("playing");
+  }
+}
+
+function onLeft(btn, song) {
+  if (answeredSet.has(btn.dataset.id)) return;
+  playSrc(song.leftAudio, btn);
+  document.querySelectorAll("#leftCol .card").forEach(b => b.classList.remove("selected"));
+  btn.classList.add("selected");
+  pickedLeft = { btn, song };
+  // 显示手拿笔
+  document.getElementById("hand").style.display = "block";
+}
+
+// 鼠标移动时手拿笔跟随，鼠标对准笔尖
+document.addEventListener("mousemove", function(e) {
+  const hand = document.getElementById("hand");
+  if (hand.style.display === "block") {
+    // 笔尖在图片的左下角位置（从左15%，从上80%）
+    // 图片宽160px，高约213px
+    // 笔尖位置：x=24px, y=170px
+    // 所以图片左上角应该在：mouseX - 24px, mouseY - 170px
+    hand.style.left = (e.clientX - 24) + "px";
+    hand.style.top = (e.clientY - 170) + "px";
+  }
+});
+
+function onRight(btn, song) {
+  if (answeredSet.has("r" + btn.dataset.id)) return;
+  if (!pickedLeft) { return; } // 没选左边就不播放
+  const { btn: lBtn, song: lSong } = pickedLeft;
+  const leftId = lBtn.dataset.id;
+  const rightId = btn.dataset.id;
+  
+  answeredSet.add(leftId);
+  answeredSet.add("r" + rightId);
+  pickedLeft = null;
+  // 隐藏手拿笔
+  document.getElementById("hand").style.display = "none";
+  
+  if (lSong.song === song.song) {
+    lBtn.classList.add("matched"); lBtn.classList.remove("selected","playing");
+    btn.classList.add("matched");
+    drawLine(lBtn, btn, "#5a9a6a");
+    matched[leftId] = rightId;
+    playCorrectSound();
+    playSrc(song.rightAudio, btn); // 连对成功才播放右边声音
+    updateProgress();
+    checkFinish();
+  } else {
+    errCount++;
+    document.getElementById("errCount").textContent = errCount;
+    lBtn.classList.add("wrong"); lBtn.classList.remove("selected","playing");
+    btn.classList.add("wrong");
+    drawLine(lBtn, btn, "#c85a5a");
+    playWrongSound();
+    stopAudio(); // 连错后停止所有音频
+    toast(`错了！这是《${lSong.song}》`); // 连错不播放右边声音
+    updateProgress();
+    checkFinish();
+  }
+}
+
+function drawLine(lBtn, rBtn, color) {
+  const svg = document.getElementById("line-svg");
+  const game = document.getElementById("game");
+  const gr = game.getBoundingClientRect();
+  const lr = lBtn.getBoundingClientRect();
+  const rr = rBtn.getBoundingClientRect();
+  const x1 = lr.right - gr.left, y1 = lr.top + lr.height/2 - gr.top;
+  const x2 = rr.left - gr.left, y2 = rr.top + rr.height/2 - gr.top;
+  const mx = (x1+x2)/2;
+  const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  p.setAttribute("d", `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`);
+  p.setAttribute("stroke", color);
+  svg.appendChild(p);
+}
+
+function checkFinish() {
+  const total = levels[lvIdx].songs.length;
+  const answeredCount = Object.keys(matched).length + errCount;
+  if (answeredCount === total) {
+    setTimeout(() => showResult(), 500);
+  }
+}
+
+function showResult() {
+  const total = levels[lvIdx].songs.length;
+  const correct = Object.keys(matched).length;
+  const wrong = errCount;
+  const rate = Math.round(correct / total * 100);
+  
+  let title, desc, emoji;
+  if (correct === total) {
+    title = "完美通关！";
+    desc = `全对！${total}/${total}，错误 0 次，太厉害了！`;
+    emoji = "🎉";
+    confetti();
+  } else if (rate >= 70) {
+    title = "很棒！";
+    desc = `${correct}/${total} 正确，错误 ${wrong} 次，继续加油！`;
+    emoji = "👏";
+    confetti();
+  } else if (rate >= 40) {
+    title = "不错哦";
+    desc = `${correct}/${total} 正确，错误 ${wrong} 次，再练练会更好！`;
+    emoji = "💪";
+  } else {
+    title = "加油！";
+    desc = `${correct}/${total} 正确，错误 ${wrong} 次，别灰心，多听几遍就熟了！`;
+    emoji = "🌱";
+  }
+  
+  document.getElementById("winTitle").textContent = emoji + " " + title;
+  document.getElementById("winText").textContent = desc;
+  document.getElementById("winOv").classList.add("show");
+}
+
+function confetti() {
+  // 简单撒花效果
+  for (let i = 0; i < 30; i++) {
+    const c = document.createElement("div");
+    c.style.cssText = `
+      position: fixed; width: 10px; height: 10px;
+      background: hsl(${Math.random()*360}, 80%, 60%);
+      left: ${Math.random()*100}vw; top: -10px;
+      border-radius: ${Math.random() > 0.5 ? "50%" : "2px"};
+      z-index: 9999; pointer-events: none;
+      transition: all 2s ease-out;
+    `;
+    document.body.appendChild(c);
+    setTimeout(() => {
+      c.style.top = "110vh";
+      c.style.transform = `rotate(${Math.random()*720}deg)`;
+    }, 10);
+    setTimeout(() => c.remove(), 2100);
+  }
+}
+
+function giveUp() {
+  showResult();
+}
+
+function restart() { loadLevel(lvIdx); }
+function nextLevel() { loadLevel((lvIdx+1) % levels.length); }
+
+// ===== 密码验证 =====
+const ADMIN_PWD = "02468#abAB";
+let isAdmin = false;
+
+function openPwd() {
+  document.getElementById("pwdOv").style.display = "flex";
+  document.getElementById("pwdInput").value = "";
+  document.getElementById("pwdInput").focus();
+}
+function closePwd() {
+  document.getElementById("pwdOv").style.display = "none";
+}
+function checkPwd() {
+  const pwd = document.getElementById("pwdInput").value;
+  if (pwd === ADMIN_PWD) {
+    isAdmin = true;
+    closePwd();
+    openEditor();
+    toast("管理员验证通过");
+  } else {
+    toast("密码错误");
+  }
+}
+
+// ===== 编辑器 =====
+function quickUpload() {
+  if (!isAdmin) {
+    openPwd();
+    return;
+  }
+  openEditor();
+  setTimeout(() => toast("在歌曲列表里点一首歌，就能上传音频切片"), 500);
+}
+
+function openEditor() {
+  if (!isAdmin) {
+    openPwd();
+    return;
+  }
+  document.getElementById("editorOv").classList.add("show");
+  renderEditLevelSelect();
+  renderSongList();
+}
+function closeEditor() {
+  document.getElementById("editorOv").classList.remove("show");
+  loadData();
+}
+function renderEditLevelSelect() {
+  const sel = document.getElementById("editLevel");
+  sel.innerHTML = "";
+  levels.forEach((lv, i) => {
+    const o = document.createElement("option");
+    o.value = i; o.textContent = lv.name;
+    if (i === lvIdx) o.selected = true;
+    sel.appendChild(o);
+  });
+  sel.onchange = () => {
+    lvIdx = parseInt(sel.value);
+    document.getElementById("levelName").value = levels[lvIdx].name;
+    document.getElementById("levelParticle").value = levels[lvIdx].particle;
+    renderSongList();
+  };
+  document.getElementById("levelName").value = levels[lvIdx].name;
+  document.getElementById("levelParticle").value = levels[lvIdx].particle;
+}
+
+async function saveLevelMeta() {
+  const name = document.getElementById("levelName").value.trim();
+  const particle = document.getElementById("levelParticle").value.trim();
+  if (!name || !particle) { toast("关卡名和语气词必填"); return; }
+  const { error } = await sb.from("levels").update({ name, particle }).eq("id", levels[lvIdx].id);
+  if (error) { toast("保存失败: " + error.message); return; }
+  levels[lvIdx].name = name;
+  levels[lvIdx].particle = particle;
+  renderEditLevelSelect(); renderTabs();
+  toast("已保存");
+}
+
+async function addLevel() {
+  const { data, error } = await sb.from("levels").insert({ name: "新关卡", particle: "啊~", sort_order: levels.length }).select();
+  if (error) { toast("新建失败: " + error.message); return; }
+  levels.push({ id: data[0].id, name: "新关卡", particle: "啊~", songs: [] });
+  lvIdx = levels.length - 1;
+  renderEditLevelSelect(); renderSongList();
+}
+
+async function deleteLevel() {
+  if (levels.length <= 1) { toast("至少保留一个关卡"); return; }
+  if (!confirm(`删除「${levels[lvIdx].name}」？`)) return;
+  const { error } = await sb.from("levels").delete().eq("id", levels[lvIdx].id);
+  if (error) { toast("删除失败: " + error.message); return; }
+  levels.splice(lvIdx, 1); lvIdx = 0;
+  renderEditLevelSelect(); renderSongList();
+}
+
+function renderSongList() {
+  const el = document.getElementById("songList");
+  el.innerHTML = "";
+  levels[lvIdx].songs.forEach((s, i) => {
+    const d = document.createElement("div");
+    d.className = "edit-item";
+    d.innerHTML = `
+      <div class="head">
+        <span class="title">${s.lyric}</span>
+        <span class="del" data-i="${i}">&times;</span>
+      </div>
+      <div>
+        <span class="audio-tag ${s.leftAudio ? 'yes':'no'}">左${s.leftAudio?'✓':'✗'}</span>
+        <span class="audio-tag ${s.rightAudio ? 'yes':'no'}">右${s.rightAudio?'✓':'✗'}</span>
+        <span style="color:var(--text2);font-size:12px">《${s.song}》</span>
+      </div>`;
+    d.onclick = (e) => { if (e.target.classList.contains("del")) return; openSongEditor(i); };
+    d.querySelector(".del").onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm("删除这首歌？")) return;
+      const { error } = await sb.from("songs").delete().eq("id", s.id);
+      if (error) { toast("删除失败: " + error.message); return; }
+      levels[lvIdx].songs.splice(i, 1);
+      renderSongList();
+    };
+    el.appendChild(d);
+  });
+}
+
+function addSong() {
+  editSongIdx = -1;
+  document.getElementById("sLyric").value = "";
+  document.getElementById("sSong").value = "";
+  pendingLeftAudio = null; pendingRightAudio = null;
+  document.getElementById("leftFileText").textContent = "选择音频";
+  document.getElementById("leftFileBtn").classList.remove("has");
+  document.getElementById("rightFileText").textContent = "选择音频";
+  document.getElementById("rightFileBtn").classList.remove("has");
+  document.getElementById("songOv").classList.add("show");
+}
+function openSongEditor(i) {
+  editSongIdx = i;
+  const s = levels[lvIdx].songs[i];
+  document.getElementById("sLyric").value = s.lyric;
+  document.getElementById("sSong").value = s.song;
+  pendingLeftAudio = s.leftAudio; pendingRightAudio = s.rightAudio;
+  
+  const leftHas = s.leftAudio && !s.leftAudio.startsWith("synth:");
+  const rightHas = s.rightAudio && !s.rightAudio.startsWith("synth:");
+  document.getElementById("leftFileText").textContent = leftHas ? "已有音频（点击替换上传）" : (s.leftAudio ? "模拟音频（点击替换上传）" : "无音频（点击上传）");
+  document.getElementById("leftFileBtn").classList.toggle("has", !!s.leftAudio);
+  document.getElementById("rightFileText").textContent = rightHas ? "已有音频（点击替换上传）" : (s.rightAudio ? "模拟音频（点击替换上传）" : "无音频（点击上传）");
+  document.getElementById("rightFileBtn").classList.toggle("has", !!s.rightAudio);
+  
+  document.getElementById("songOv").classList.add("show");
+}
+function closeSongEditor() { document.getElementById("songOv").classList.remove("show"); }
+
+document.getElementById("sLeftAudio").addEventListener("change", function(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    pendingLeftAudio = ev.target.result;
+    document.getElementById("leftFileText").textContent = `已选: ${f.name.slice(0,12)}`;
+    document.getElementById("leftFileBtn").classList.add("has");
+  };
+  reader.readAsDataURL(f);
+});
+document.getElementById("sRightAudio").addEventListener("change", function(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    pendingRightAudio = ev.target.result;
+    document.getElementById("rightFileText").textContent = `已选: ${f.name.slice(0,12)}`;
+    document.getElementById("rightFileBtn").classList.add("has");
+  };
+  reader.readAsDataURL(f);
+});
+document.getElementById("testLeftBtn").onclick = () => {
+  if (pendingLeftAudio) { playSrc(pendingLeftAudio, {classList:{remove:()=>{}}}); } else toast("还没选音频");
+};
+document.getElementById("testRightBtn").onclick = () => {
+  if (pendingRightAudio) { playSrc(pendingRightAudio, {classList:{remove:()=>{}}}); } else toast("还没选音频");
+};
+
+async function saveSong() {
+  const lyric = document.getElementById("sLyric").value.trim();
+  const song = document.getElementById("sSong").value.trim();
+  if (!lyric || !song) { toast("歌词和歌名必填"); return; }
+  
+  if (editSongIdx === -1) {
+    // 新增
+    const { data, error } = await sb.from("songs").insert({
+      level_id: levels[lvIdx].id,
+      lyric, song,
+      left_audio: pendingLeftAudio,
+      right_audio: pendingRightAudio,
+      sort_order: levels[lvIdx].songs.length
+    }).select();
+    if (error) { toast("保存失败: " + error.message); return; }
+    levels[lvIdx].songs.push({ id: data[0].id, lyric, song, leftAudio: pendingLeftAudio, rightAudio: pendingRightAudio });
+  } else {
+    // 更新
+    const s = levels[lvIdx].songs[editSongIdx];
+    const { error } = await sb.from("songs").update({
+      lyric, song,
+      left_audio: pendingLeftAudio,
+      right_audio: pendingRightAudio
+    }).eq("id", s.id);
+    if (error) { toast("保存失败: " + error.message); return; }
+    levels[lvIdx].songs[editSongIdx] = { id: s.id, lyric, song, leftAudio: pendingLeftAudio, rightAudio: pendingRightAudio };
+  }
+  closeSongEditor(); renderSongList();
+  toast("已保存");
+}
+
+// 启动
+loadData();
+</script>
+</body>
+</html>
