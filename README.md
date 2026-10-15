@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.png" width="120" alt="guofeng-caige-lianxian"></p>
+
 # 古风猜歌连线游戏
 
 一个蓝白青花瓷古风风格的"猜歌连线"网页小游戏，左右两列歌词卡片连线配对。
